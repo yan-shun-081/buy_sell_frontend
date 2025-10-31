@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Buy & Sell App</title>
+
+  <style>
+    /* -------- Base Styles -------- */
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f4f6f8;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+    }
+
+    .container {
+      background: #fff;
+      width: 95%;
+      max-width: 700px;
+      margin-top: 30px;
+      padding: 25px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 25px;
+      color: #333;
+      font-size: 24px;
+    }
+
+    /* -------- Buttons -------- */
+    .button-group {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      margin-bottom: 25px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      padding: 10px 25px;
+      border: none;
+      border-radius: 6px;
+      background: #007bff;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    button:hover {
+      background: #0056b3;
+    }
+
+    /* -------- Forms -------- */
+    form {
+      display: none;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    label {
+      font-weight: bold;
+      color: #333;
+    }
+
+    input, textarea {
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-size: 15px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    textarea {
+      resize: vertical;
+    }
+
+    /* -------- Items Section -------- */
+    #items-container {
+      display: none;
+      margin-top: 20px;
+    }
+
+    .item-card {
+      background: #fafafa;
+      border: 1px solid #e0e0e0;
+      border-radius: 10px;
+      padding: 15px;
+      margin-bottom: 25px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+
+    .item-card h3 {
+      margin: 0 0 10px 0;
+      color: #222;
+      font-size: 18px;
+    }
+
+    .item-card p {
+      margin: 5px 0;
+      color: #555;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    iframe {
+      width: 100%;
+      height: 250px;
+      border: none;
+      border-radius: 6px;
+      margin-bottom: 10px;
+      background: #f0f0f0;
+    }
+
+    /* -------- Messages -------- */
+    .success, .error {
+      text-align: center;
+      margin-top: 15px;
+      font-weight: bold;
+    }
+    .success { color: green; }
+    .error { color: red; }
+
+    /* -------- Responsive Design -------- */
+    @media (max-width: 768px) {
+      h1 { font-size: 20px; }
+      iframe { height: 220px; }
+      button { font-size: 15px; padding: 8px 18px; }
+    }
+
+    @media (max-width: 480px) {
+      .container { width: 95%; padding: 20px; }
+      iframe { height: 200px; }
+      label { font-size: 14px; }
+      input, textarea { font-size: 14px; }
+      .item-card h3 { font-size: 16px; }
+      .item-card p { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>Buy & Sell App</h1>
+
+    <div class="button-group">
+      <button id="sellBtn">Sell</button>
+      <button id="buyBtn">Buy</button>
+    </div>
+
+    <!-- SELL FORM -->
+    <form id="sellForm">
+      <label>Archive URL (only from archive.org)</label>
+      <input type="url" id="archive_url" placeholder="https://archive.org/details/..." required>
+
+      <label>Item</label>
+      <input type="text" id="item" required>
+
+      <label>Details</label>
+      <textarea id="details" rows="3" required></textarea>
+
+      <label>Discount (%)</label>
+      <input type="number" id="discount" min="0" max="100" required>
+
+      <label>Price (₹)</label>
+      <input type="number" id="price" min="0" required>
+
+      <label>Address</label>
+      <input type="text" id="address" required>
+
+      <label>Phone Number 1</label>
+      <input type="tel" id="phone_number_1" required>
+
+      <label>Phone Number 2</label>
+      <input type="tel" id="phone_number_2">
+
+      <label>URL</label>
+      <input type="url" id="url" required>
+
+      <label>Disappear Date</label>
+      <input type="date" id="disappear_date" required>
+
+      <label>Post</label>
+      <textarea id="post" rows="2" placeholder="Enter post text..." required></textarea>
+
+      <button type="submit">Submit Post</button>
+
+      <div id="responseMsg"></div>
+    </form>
+
+    <!-- ITEMS CONTAINER -->
+    <div id="items-container"></div>
+  </div>
+
+  <script>
+    const sellBtn = document.getElementById('sellBtn');
+    const buyBtn = document.getElementById('buyBtn');
+    const sellForm = document.getElementById('sellForm');
+    const itemsContainer = document.getElementById('items-container');
+    const disappearInput = document.getElementById('disappear_date');
+    const responseMsg = document.getElementById('responseMsg');
+    const archiveInput = document.getElementById('archive_url');
+
+    const BASE_URL = 'https://buy_sell_metadata_backend.civilwan.workers.dev';
+
+    // In-memory cache (session-based)
+    let cachedItems = null;
+
+    // Set disappear_date range (today → +10 days)
+    const today = new Date();
+    const minDate = today.toISOString().split('T')[0];
+    const maxDate = new Date(today.setDate(today.getDate() + 10)).toISOString().split('T')[0];
+    disappearInput.min = minDate;
+    disappearInput.max = maxDate;
+
+    // SELL button
+    sellBtn.onclick = () => {
+      sellForm.style.display = 'flex';
+      itemsContainer.style.display = 'none';
+      responseMsg.textContent = '';
+    };
+
+    // BUY button
+    buyBtn.onclick = async () => {
+      sellForm.style.display = 'none';
+      itemsContainer.style.display = 'block';
+      responseMsg.textContent = '';
+
+      // ✅ If we already have cached items, just reuse them
+      if (cachedItems) {
+        console.log('📦 Using internally stored JSON');
+        displayItems(cachedItems);
+        return;
+      }
+
+      // Otherwise, fetch from backend only once
+      itemsContainer.innerHTML = '<p>Loading items...</p>';
+
+      try {
+        const res = await fetch(`${BASE_URL}/api/items`);
+        const data = await res.json();
+
+        if (!Array.isArray(data) || data.length === 0) {
+          itemsContainer.innerHTML = '<p>No items available.</p>';
+          return;
+        }
+
+        // Store data internally
+        cachedItems = data;
+        console.log('✅ Data fetched from backend and stored internally.');
+
+        displayItems(data);
+      } catch (err) {
+        console.error(err);
+        itemsContainer.innerHTML = '<p style="color:red;">Error loading items.</p>';
+      }
+    };
+
+    // Display items
+    function displayItems(data) {
+      itemsContainer.innerHTML = data.map(item => `
+        <div class="item-card">
+          <iframe src="${item.archive_url}" title="${item.item}" loading="lazy"></iframe>
+          <h3>${item.item}</h3>
+          <p><strong>Details:</strong> ${item.details}</p>
+          <p><strong>Price:</strong> ₹${item.price}</p>
+          <p><strong>Discount:</strong> ${item.discount}%</p>
+          <p><strong>Address:</strong> ${item.address}</p>
+          <p><strong>Phone 1:</strong> ${item.phone_number_1}</p>
+          <p><strong>Phone 2:</strong> ${item.phone_number_2 || 'N/A'}</p>
+          <p><strong>URL:</strong> <a href="${item.url}" target="_blank">${item.url}</a></p>
+          <p><strong>Disappear Date:</strong> ${item.disappear_date}</p>
+          <p><strong>Post:</strong> ${item.post}</p>
+        </div>
+      `).join('');
+    }
+
+    // SELL form submission
+    sellForm.onsubmit = async (e) => {
+      e.preventDefault();
+      responseMsg.textContent = '';
+
+      // ✅ Check if Archive URL is from archive.org
+      const archiveURL = archiveInput.value.trim();
+      if (!archiveURL.startsWith("https://archive.org/") && !archiveURL.startsWith("http://archive.org/")) {
+        responseMsg.textContent = "❌ Please enter a valid archive.org URL.";
+        responseMsg.className = 'error';
+        return;
+      }
+
+      const metadata = {
+        archive_url: archiveURL,
+        item: document.getElementById('item').value,
+        details: document.getElementById('details').value,
+        discount: document.getElementById('discount').value,
+        price: document.getElementById('price').value,
+        address: document.getElementById('address').value,
+        phone_number_1: document.getElementById('phone_number_1').value,
+        phone_number_2: document.getElementById('phone_number_2').value,
+        url: document.getElementById('url').value,
+        disappear_date: document.getElementById('disappear_date').value,
+        post: document.getElementById('post').value
+      };
+
+      try {
+        const res = await fetch(`${BASE_URL}/api/sell`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(metadata)
+        });
+
+        if (res.ok) {
+          responseMsg.textContent = '✅ Post submitted successfully!';
+          responseMsg.className = 'success';
+          sellForm.reset();
+          cachedItems = null; // clear internal cache
+        } else {
+          responseMsg.textContent = '❌ Failed to submit post.';
+          responseMsg.className = 'error';
+        }
+      } catch (err) {
+        responseMsg.textContent = '⚠️ Error connecting to backend.';
+        responseMsg.className = 'error';
+      }
+    };
+  </script>
+</body>
+</html>
