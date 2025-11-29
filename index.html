@@ -98,6 +98,7 @@
       margin-bottom: 25px;
       overflow: hidden;
       box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      position: relative;
     }
 
     .item-card h3 {
@@ -113,13 +114,69 @@
       line-height: 1.5;
     }
 
-    iframe {
+    iframe, video, img {
       width: 100%;
-      height: 250px;
-      border: none;
       border-radius: 6px;
       margin-bottom: 10px;
       background: #f0f0f0;
+    }
+
+    video {
+      max-height: 350px;
+    }
+
+    /* Fullscreen overlay */
+    #fullscreen-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0,0,0,0.95);
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #fullscreen-overlay iframe,
+    #fullscreen-overlay video,
+    #fullscreen-overlay img {
+      width: 100vw;
+      height: 100vh;
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      border-radius: 0;
+    }
+
+    #fullscreen-overlay button {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: #007bff;
+      color: white;
+      font-size: 16px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      z-index: 10000;
+    }
+
+    /* Fullscreen icon */
+    .fullscreen-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: rgba(0,0,0,0.6);
+      color: white;
+      border: none;
+      padding: 5px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      z-index: 2;
     }
 
     /* -------- Messages -------- */
@@ -134,13 +191,13 @@
     /* -------- Responsive Design -------- */
     @media (max-width: 768px) {
       h1 { font-size: 20px; }
-      iframe { height: 220px; }
+      video { max-height: 300px; }
       button { font-size: 15px; padding: 8px 18px; }
     }
 
     @media (max-width: 480px) {
       .container { width: 95%; padding: 20px; }
-      iframe { height: 200px; }
+      video { max-height: 250px; }
       label { font-size: 14px; }
       input, textarea { font-size: 14px; }
       .item-card h3 { font-size: 16px; }
@@ -202,6 +259,11 @@
     <div id="items-container"></div>
   </div>
 
+  <!-- Fullscreen overlay -->
+  <div id="fullscreen-overlay" class="flex">
+    <button id="close-overlay">Close</button>
+  </div>
+
   <script>
     const sellBtn = document.getElementById('sellBtn');
     const buyBtn = document.getElementById('buyBtn');
@@ -210,40 +272,33 @@
     const disappearInput = document.getElementById('disappear_date');
     const responseMsg = document.getElementById('responseMsg');
     const archiveInput = document.getElementById('archive_url');
+    const fullscreenOverlay = document.getElementById('fullscreen-overlay');
 
     const BASE_URL = 'https://buy_sell_metadata_backend.civilwan.workers.dev';
-
-    // In-memory cache (session-based)
     let cachedItems = null;
 
-    // Set disappear_date range (today → +10 days)
     const today = new Date();
     const minDate = today.toISOString().split('T')[0];
     const maxDate = new Date(today.setDate(today.getDate() + 10)).toISOString().split('T')[0];
     disappearInput.min = minDate;
     disappearInput.max = maxDate;
 
-    // SELL button
     sellBtn.onclick = () => {
       sellForm.style.display = 'flex';
       itemsContainer.style.display = 'none';
       responseMsg.textContent = '';
     };
 
-    // BUY button
     buyBtn.onclick = async () => {
       sellForm.style.display = 'none';
       itemsContainer.style.display = 'block';
       responseMsg.textContent = '';
 
-      // ✅ If we already have cached items, just reuse them
       if (cachedItems) {
-        console.log('📦 Using internally stored JSON');
         displayItems(cachedItems);
         return;
       }
 
-      // Otherwise, fetch from backend only once
       itemsContainer.innerHTML = '<p>Loading items...</p>';
 
       try {
@@ -255,10 +310,7 @@
           return;
         }
 
-        // Store data internally
         cachedItems = data;
-        console.log('✅ Data fetched from backend and stored internally.');
-
         displayItems(data);
       } catch (err) {
         console.error(err);
@@ -266,11 +318,64 @@
       }
     };
 
-    // Display items
-    function displayItems(data) {
-      itemsContainer.innerHTML = data.map(item => `
-        <div class="item-card">
-          <iframe src="${item.archive_url}" title="${item.item}" loading="lazy"></iframe>
+    async function fetchArchiveMedia(url) {
+      try {
+        const id = url.split('/details/')[1];
+        const res = await fetch(`https://archive.org/metadata/${id}`);
+        const metadata = await res.json();
+        const files = metadata.files || [];
+
+        // Priority: MP4 → JPEG → PNG
+        let mediaFile = files.find(f => f.name.endsWith('.mp4'));
+        let type = 'video';
+        if (!mediaFile) {
+          mediaFile = files.find(f => f.name.endsWith('.jpg') || f.name.endsWith('.jpeg'));
+          type = 'image';
+        }
+        if (!mediaFile) {
+          mediaFile = files.find(f => f.name.endsWith('.png'));
+          type = 'image';
+        }
+        if (!mediaFile) return null;
+
+        const mediaUrl = `https://archive.org/download/${id}/${mediaFile.name}`;
+        return { url: mediaUrl, type };
+      } catch (err) {
+        console.error(err);
+        return null;
+      }
+    }
+
+    async function displayItems(data) {
+      itemsContainer.innerHTML = '';
+      for (const item of data) {
+        const media = await fetchArchiveMedia(item.archive_url);
+        let mediaHTML = '';
+
+        if (media) {
+          if (media.type === 'video') {
+            mediaHTML = `
+              <div style="position: relative;">
+                <video src="${media.url}" controls></video>
+                <button class="fullscreen-btn" onclick="openFullscreen('${media.url}','video')">⤢</button>
+              </div>
+            `;
+          } else if (media.type === 'image') {
+            mediaHTML = `
+              <div style="position: relative;">
+                <img src="${media.url}" alt="${item.item}" />
+                <button class="fullscreen-btn" onclick="openFullscreen('${media.url}','image')">⤢</button>
+              </div>
+            `;
+          }
+        } else {
+          mediaHTML = `<iframe src="${item.archive_url}" title="${item.item}"></iframe>`;
+        }
+
+        const card = document.createElement('div');
+        card.className = 'item-card';
+        card.innerHTML = `
+          ${mediaHTML}
           <h3>${item.item}</h3>
           <p><strong>Details:</strong> ${item.details}</p>
           <p><strong>Price:</strong> ₹${item.price}</p>
@@ -281,16 +386,48 @@
           <p><strong>URL:</strong> <a href="${item.url}" target="_blank">${item.url}</a></p>
           <p><strong>Disappear Date:</strong> ${item.disappear_date}</p>
           <p><strong>Post:</strong> ${item.post}</p>
-        </div>
-      `).join('');
+          <button onclick="openFullscreen('${item.archive_url}','archive')">View in Archive</button>
+        `;
+        itemsContainer.appendChild(card);
+      }
     }
 
-    // SELL form submission
+    function openFullscreen(url, type) {
+      fullscreenOverlay.innerHTML = `<button id="close-overlay">Close</button>`;
+      let element;
+      if (type === 'video') {
+        element = document.createElement('video');
+        element.src = url;
+        element.controls = true;
+        element.autoplay = true;
+      } else if (type === 'image') {
+        element = document.createElement('img');
+        element.src = url;
+      } else if (type === 'archive') {
+        element = document.createElement('iframe');
+        element.src = url;
+      }
+      fullscreenOverlay.appendChild(element);
+      fullscreenOverlay.style.display = 'flex';
+
+      document.getElementById('close-overlay').onclick = () => {
+        fullscreenOverlay.style.display = 'none';
+        fullscreenOverlay.innerHTML = '<button id="close-overlay">Close</button>';
+      };
+
+      // ESC key to close
+      document.onkeydown = function(e) {
+        if(e.key === "Escape") {
+          fullscreenOverlay.style.display = 'none';
+          fullscreenOverlay.innerHTML = '<button id="close-overlay">Close</button>';
+        }
+      };
+    }
+
     sellForm.onsubmit = async (e) => {
       e.preventDefault();
       responseMsg.textContent = '';
 
-      // ✅ Check if Archive URL is from archive.org
       const archiveURL = archiveInput.value.trim();
       if (!archiveURL.startsWith("https://archive.org/") && !archiveURL.startsWith("http://archive.org/")) {
         responseMsg.textContent = "❌ Please enter a valid archive.org URL.";
@@ -323,7 +460,7 @@
           responseMsg.textContent = '✅ Post submitted successfully!';
           responseMsg.className = 'success';
           sellForm.reset();
-          cachedItems = null; // clear internal cache
+          cachedItems = null;
         } else {
           responseMsg.textContent = '❌ Failed to submit post.';
           responseMsg.className = 'error';
