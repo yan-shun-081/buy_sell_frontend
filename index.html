@@ -6,7 +6,6 @@
   <title>Buy & Sell App</title>
 
   <style>
-    /* -------- Base Styles -------- */
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background: #f4f6f8;
@@ -35,7 +34,6 @@
       font-size: 24px;
     }
 
-    /* -------- Buttons -------- */
     .button-group {
       display: flex;
       justify-content: center;
@@ -59,7 +57,6 @@
       background: #0056b3;
     }
 
-    /* -------- Forms -------- */
     form {
       display: none;
       flex-direction: column;
@@ -84,7 +81,6 @@
       resize: vertical;
     }
 
-    /* -------- Items Section -------- */
     #items-container {
       display: none;
       margin-top: 20px;
@@ -125,7 +121,6 @@
       max-height: 350px;
     }
 
-    /* Fullscreen overlay */
     #fullscreen-overlay {
       display: none;
       position: fixed;
@@ -164,7 +159,6 @@
       z-index: 10000;
     }
 
-    /* Fullscreen icon */
     .fullscreen-btn {
       position: absolute;
       top: 8px;
@@ -179,7 +173,6 @@
       z-index: 2;
     }
 
-    /* -------- Messages -------- */
     .success, .error {
       text-align: center;
       margin-top: 15px;
@@ -187,22 +180,6 @@
     }
     .success { color: green; }
     .error { color: red; }
-
-    /* -------- Responsive Design -------- */
-    @media (max-width: 768px) {
-      h1 { font-size: 20px; }
-      video { max-height: 300px; }
-      button { font-size: 15px; padding: 8px 18px; }
-    }
-
-    @media (max-width: 480px) {
-      .container { width: 95%; padding: 20px; }
-      video { max-height: 250px; }
-      label { font-size: 14px; }
-      input, textarea { font-size: 14px; }
-      .item-card h3 { font-size: 16px; }
-      .item-card p { font-size: 13px; }
-    }
   </style>
 </head>
 <body>
@@ -217,7 +194,7 @@
 
     <!-- SELL FORM -->
     <form id="sellForm">
-      <label>Archive URL (only from archive.org)</label>
+      <label>Archive URL</label>
       <input type="url" id="archive_url" placeholder="https://archive.org/details/..." required>
 
       <label>Item</label>
@@ -227,10 +204,10 @@
       <textarea id="details" rows="3" required></textarea>
 
       <label>Discount (%)</label>
-      <input type="number" id="discount" min="0" max="100" required>
+      <input type="number" id="discount" required>
 
       <label>Price (₹)</label>
-      <input type="number" id="price" min="0" required>
+      <input type="number" id="price" required>
 
       <label>Address</label>
       <input type="text" id="address" required>
@@ -248,18 +225,17 @@
       <input type="date" id="disappear_date" required>
 
       <label>Post</label>
-      <textarea id="post" rows="2" placeholder="Enter post text..." required></textarea>
+      <textarea id="post" rows="2" required></textarea>
 
       <button type="submit">Submit Post</button>
-
       <div id="responseMsg"></div>
     </form>
 
-    <!-- ITEMS CONTAINER -->
+    <!-- ITEMS -->
     <div id="items-container"></div>
   </div>
 
-  <!-- Fullscreen overlay -->
+  <!-- FULLSCREEN -->
   <div id="fullscreen-overlay" class="flex">
     <button id="close-overlay">Close</button>
   </div>
@@ -278,10 +254,8 @@
     let cachedItems = null;
 
     const today = new Date();
-    const minDate = today.toISOString().split('T')[0];
-    const maxDate = new Date(today.setDate(today.getDate() + 10)).toISOString().split('T')[0];
-    disappearInput.min = minDate;
-    disappearInput.max = maxDate;
+    disappearInput.min = today.toISOString().split('T')[0];
+    disappearInput.max = new Date(today.setDate(today.getDate() + 10)).toISOString().split('T')[0];
 
     sellBtn.onclick = () => {
       sellForm.style.display = 'flex';
@@ -294,23 +268,20 @@
       itemsContainer.style.display = 'block';
       responseMsg.textContent = '';
 
-      if (cachedItems) {
-        displayItems(cachedItems);
-        return;
-      }
-
-      itemsContainer.innerHTML = '<p>Loading items...</p>';
+      itemsContainer.innerHTML = '<p>Loading...</p>';
 
       try {
         const res = await fetch(`${BASE_URL}/api/items`);
-        const data = await res.json();
+        let data = await res.json();
 
         if (!Array.isArray(data) || data.length === 0) {
           itemsContainer.innerHTML = '<p>No items available.</p>';
           return;
         }
 
-        cachedItems = data;
+        // 🔀 SHUFFLE JSON RANDOMLY
+        data.sort(() => Math.random() - 0.5);
+
         displayItems(data);
       } catch (err) {
         console.error(err);
@@ -325,29 +296,28 @@
         const metadata = await res.json();
         const files = metadata.files || [];
 
-        // Priority: MP4 → JPEG → PNG
-        let mediaFile = files.find(f => f.name.endsWith('.mp4'));
+        let file = files.find(f => f.name.endsWith('.mp4'));
         let type = 'video';
-        if (!mediaFile) {
-          mediaFile = files.find(f => f.name.endsWith('.jpg') || f.name.endsWith('.jpeg'));
-          type = 'image';
-        }
-        if (!mediaFile) {
-          mediaFile = files.find(f => f.name.endsWith('.png'));
-          type = 'image';
-        }
-        if (!mediaFile) return null;
 
-        const mediaUrl = `https://archive.org/download/${id}/${mediaFile.name}`;
-        return { url: mediaUrl, type };
-      } catch (err) {
-        console.error(err);
+        if (!file) {
+          file = files.find(f => f.name.match(/\.(jpg|jpeg|png)$/i));
+          type = 'image';
+        }
+
+        if (!file) return null;
+
+        return {
+          url: `https://archive.org/download/${id}/${file.name}`,
+          type
+        };
+      } catch {
         return null;
       }
     }
 
     async function displayItems(data) {
       itemsContainer.innerHTML = '';
+
       for (const item of data) {
         const media = await fetchArchiveMedia(item.archive_url);
         let mediaHTML = '';
@@ -360,16 +330,16 @@
                 <button class="fullscreen-btn" onclick="openFullscreen('${media.url}','video')">⤢</button>
               </div>
             `;
-          } else if (media.type === 'image') {
+          } else {
             mediaHTML = `
               <div style="position: relative;">
-                <img src="${media.url}" alt="${item.item}" />
+                <img src="${media.url}" />
                 <button class="fullscreen-btn" onclick="openFullscreen('${media.url}','image')">⤢</button>
               </div>
             `;
           }
         } else {
-          mediaHTML = `<iframe src="${item.archive_url}" title="${item.item}"></iframe>`;
+          mediaHTML = `<iframe src="${item.archive_url}"></iframe>`;
         }
 
         const card = document.createElement('div');
@@ -394,48 +364,44 @@
 
     function openFullscreen(url, type) {
       fullscreenOverlay.innerHTML = `<button id="close-overlay">Close</button>`;
-      let element;
+      let el;
+
       if (type === 'video') {
-        element = document.createElement('video');
-        element.src = url;
-        element.controls = true;
-        element.autoplay = true;
+        el = document.createElement('video');
+        el.src = url;
+        el.controls = true;
+        el.autoplay = true;
       } else if (type === 'image') {
-        element = document.createElement('img');
-        element.src = url;
-      } else if (type === 'archive') {
-        element = document.createElement('iframe');
-        element.src = url;
+        el = document.createElement('img');
+        el.src = url;
+      } else {
+        el = document.createElement('iframe');
+        el.src = url;
       }
-      fullscreenOverlay.appendChild(element);
+
+      fullscreenOverlay.appendChild(el);
       fullscreenOverlay.style.display = 'flex';
 
       document.getElementById('close-overlay').onclick = () => {
         fullscreenOverlay.style.display = 'none';
-        fullscreenOverlay.innerHTML = '<button id="close-overlay">Close</button>';
       };
 
-      // ESC key to close
-      document.onkeydown = function(e) {
-        if(e.key === "Escape") {
-          fullscreenOverlay.style.display = 'none';
-          fullscreenOverlay.innerHTML = '<button id="close-overlay">Close</button>';
-        }
+      document.onkeydown = e => {
+        if (e.key === "Escape") fullscreenOverlay.style.display = 'none';
       };
     }
 
     sellForm.onsubmit = async (e) => {
       e.preventDefault();
-      responseMsg.textContent = '';
 
       const archiveURL = archiveInput.value.trim();
-      if (!archiveURL.startsWith("https://archive.org/") && !archiveURL.startsWith("http://archive.org/")) {
-        responseMsg.textContent = "❌ Please enter a valid archive.org URL.";
-        responseMsg.className = 'error';
+      if (!archiveURL.includes("archive.org/details")) {
+        responseMsg.textContent = "❌ Enter a valid archive.org URL.";
+        responseMsg.className = "error";
         return;
       }
 
-      const metadata = {
+      const data = {
         archive_url: archiveURL,
         item: document.getElementById('item').value,
         details: document.getElementById('details').value,
@@ -451,23 +417,22 @@
 
       try {
         const res = await fetch(`${BASE_URL}/api/sell`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(metadata)
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
         });
 
         if (res.ok) {
-          responseMsg.textContent = '✅ Post submitted successfully!';
-          responseMsg.className = 'success';
+          responseMsg.textContent = "✅ Post submitted successfully!";
+          responseMsg.className = "success";
           sellForm.reset();
-          cachedItems = null;
         } else {
-          responseMsg.textContent = '❌ Failed to submit post.';
-          responseMsg.className = 'error';
+          responseMsg.textContent = "❌ Failed to submit post.";
+          responseMsg.className = "error";
         }
-      } catch (err) {
-        responseMsg.textContent = '⚠️ Error connecting to backend.';
-        responseMsg.className = 'error';
+      } catch {
+        responseMsg.textContent = "⚠️ Error connecting to backend.";
+        responseMsg.className = "error";
       }
     };
   </script>
