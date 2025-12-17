@@ -2,10 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Buy & Sell App</title>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no" />
+  <title>Buy &amp; Sell App</title>
 
   <style>
+    /* -------- Base Styles -------- */
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background: #f4f6f8;
@@ -16,176 +18,131 @@
       align-items: flex-start;
       min-height: 100vh;
     }
-
     .container {
-      background: #fff;
-      width: 95%;
-      max-width: 700px;
-      margin-top: 30px;
-      padding: 25px;
-      border-radius: 12px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      background:#fff;
+      width:95%;
+      max-width:700px;
+      margin-top:30px;
+      padding:25px;
+      border-radius:12px;
+      box-shadow:0 4px 20px rgba(0,0,0,0.1);
+    }
+    h1{ text-align:center; margin-bottom:25px; color:#333; font-size:24px; }
+    .button-group{ display:flex; justify-content:center; gap:15px; margin-bottom:25px; flex-wrap:wrap; }
+    button{
+      padding:10px 25px;
+      border:none;
+      border-radius:6px;
+      background:#007bff;
+      color:#fff;
+      font-size:16px;
+      cursor:pointer;
+      transition:background .3s;
+    }
+    button:hover{ background:#0056b3; }
+
+    /* -------- Forms -------- */
+    form{
+      display:none;
+      flex-direction:column;
+      gap:15px;
+    }
+    label{ font-weight:bold; color:#333; }
+    input, textarea{
+      padding:10px;
+      border-radius:6px;
+      border:1px solid #ccc;
+      font-size:15px;
+      width:100%;
+      box-sizing:border-box;
+    }
+    textarea{ resize:vertical; }
+
+    /* -------- Items Section -------- */
+    #items-container{
+      display:none;
+      margin-top:20px;
+    }
+    .item-card{
+      background:#fafafa;
+      border:1px solid #e0e0e0;
+      border-radius:10px;
+      padding:15px;
+      margin-bottom:25px;
+      overflow:hidden;
+      box-shadow:0 2px 8px rgba(0,0,0,0.05);
+    }
+    .item-card h3{ margin:0 0 10px; color:#222; font-size:18px; }
+    .item-card p{ margin:5px 0; color:#555; font-size:14px; line-height:1.5; }
+    iframe{
+      width:100%;
+      height:250px;
+      border:none;
+      border-radius:6px;
+      margin-bottom:10px;
+      background:#f0f0f0;
     }
 
-    h1 {
-      text-align: center;
-      margin-bottom: 25px;
-      color: #333;
-      font-size: 24px;
+    /* -------- Messages -------- */
+    .success,.error{
+      text-align:center;
+      margin-top:15px;
+      font-weight:bold;
+    }
+    .success{color:green;}
+    .error{color:red;}
+
+    /* -------- Modal (popup) -------- */
+    .modal{
+      position:fixed;
+      top:0; left:0;
+      width:100%; height:100%;
+      background:rgba(0,0,0,0.5);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      z-index:2000;
+    }
+    .modal.hidden{ display:none; }
+    .modal-content{
+      background:#fff;
+      padding:20px;
+      border-radius:10px;
+      text-align:center;
+      max-width:90%;
+      box-shadow:0 4px 12px rgba(0,0,0,0.2);
     }
 
-    .button-group {
-      display: flex;
-      justify-content: center;
-      gap: 15px;
-      margin-bottom: 25px;
-      flex-wrap: wrap;
+    /* -------- Toast -------- */
+    #toast{
+      position:fixed;
+      right:20px; bottom:20px;
+      padding:12px 16px;
+      background:rgba(0,0,0,0.6);
+      color:#fff;
+      border-radius:8px;
+      display:none;
+      z-index:2000;
     }
 
-    button {
-      padding: 10px 25px;
-      border: none;
-      border-radius: 6px;
-      background: #007bff;
-      color: white;
-      font-size: 16px;
-      cursor: pointer;
-      transition: background 0.3s;
+    @media (max-width:768px){
+      h1{font-size:20px;}
+      iframe{height:220px;}
+      button{font-size:15px;padding:8px 18px;}
     }
-
-    button:hover {
-      background: #0056b3;
+    @media (max-width:480px){
+      .container{width:95%;padding:20px;}
+      iframe{height:200px;}
+      label{font-size:14px;}
+      input,textarea{font-size:14px;}
+      .item-card h3{font-size:16px;}
+      .item-card p{font-size:13px;}
     }
-
-    form {
-      display: none;
-      flex-direction: column;
-      gap: 15px;
-    }
-
-    label {
-      font-weight: bold;
-      color: #333;
-    }
-
-    input, textarea {
-      padding: 10px;
-      border-radius: 6px;
-      border: 1px solid #ccc;
-      font-size: 15px;
-      width: 100%;
-      box-sizing: border-box;
-    }
-
-    textarea {
-      resize: vertical;
-    }
-
-    #items-container {
-      display: none;
-      margin-top: 20px;
-    }
-
-    .item-card {
-      background: #fafafa;
-      border: 1px solid #e0e0e0;
-      border-radius: 10px;
-      padding: 15px;
-      margin-bottom: 25px;
-      overflow: hidden;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-      position: relative;
-    }
-
-    .item-card h3 {
-      margin: 0 0 10px 0;
-      color: #222;
-      font-size: 18px;
-    }
-
-    .item-card p {
-      margin: 5px 0;
-      color: #555;
-      font-size: 14px;
-      line-height: 1.5;
-    }
-
-    iframe, video, img {
-      width: 100%;
-      border-radius: 6px;
-      margin-bottom: 10px;
-      background: #f0f0f0;
-    }
-
-    video {
-      max-height: 350px;
-    }
-
-    #fullscreen-overlay {
-      display: none;
-      position: fixed;
-      top: 0; left: 0;
-      width: 100vw;
-      height: 100vh;
-      background: rgba(0,0,0,0.95);
-      justify-content: center;
-      align-items: center;
-      z-index: 9999;
-      flex-direction: column;
-      overflow: hidden;
-    }
-
-    #fullscreen-overlay iframe,
-    #fullscreen-overlay video,
-    #fullscreen-overlay img {
-      width: 100vw;
-      height: 100vh;
-      max-width: 100%;
-      max-height: 100%;
-      object-fit: contain;
-      border-radius: 0;
-    }
-
-    #fullscreen-overlay button {
-      position: absolute;
-      top: 20px;
-      right: 20px;
-      background: #007bff;
-      color: white;
-      font-size: 16px;
-      padding: 8px 12px;
-      border-radius: 6px;
-      cursor: pointer;
-      z-index: 10000;
-    }
-
-    .fullscreen-btn {
-      position: absolute;
-      top: 8px;
-      right: 8px;
-      background: rgba(0,0,0,0.6);
-      color: white;
-      border: none;
-      padding: 5px 8px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 14px;
-      z-index: 2;
-    }
-
-    .success, .error {
-      text-align: center;
-      margin-top: 15px;
-      font-weight: bold;
-    }
-    .success { color: green; }
-    .error { color: red; }
   </style>
 </head>
 <body>
-
   <div class="container">
-    <h1>Buy & Sell App</h1>
+    <h1>Buy &amp; Sell App</h1>
 
     <div class="button-group">
       <button id="sellBtn">Sell</button>
@@ -194,7 +151,7 @@
 
     <!-- SELL FORM -->
     <form id="sellForm">
-      <label>Archive URL</label>
+      <label>Archive URL (only from archive.org)</label>
       <input type="url" id="archive_url" placeholder="https://archive.org/details/..." required>
 
       <label>Item</label>
@@ -204,10 +161,10 @@
       <textarea id="details" rows="3" required></textarea>
 
       <label>Discount (%)</label>
-      <input type="number" id="discount" required>
+      <input type="number" id="discount" min="0" max="100" required>
 
       <label>Price (₹)</label>
-      <input type="number" id="price" required>
+      <input type="number" id="price" min="0" required>
 
       <label>Address</label>
       <input type="text" id="address" required>
@@ -225,183 +182,108 @@
       <input type="date" id="disappear_date" required>
 
       <label>Post</label>
-      <textarea id="post" rows="2" required></textarea>
+      <textarea id="post" rows="2" placeholder="Enter post text..." required></textarea>
 
       <button type="submit">Submit Post</button>
+
       <div id="responseMsg"></div>
     </form>
 
-    <!-- ITEMS -->
+    <!-- ITEMS CONTAINER -->
     <div id="items-container"></div>
   </div>
 
-  <!-- FULLSCREEN -->
-  <div id="fullscreen-overlay" class="flex">
-    <button id="close-overlay">Close</button>
+  <!-- Modal used for ad‑confirmation -->
+  <div id="adModal" class="modal hidden">
+    <div class="modal-content">
+      <p id="adModalMessage"></p>
+      <button id="adModalYesBtn" class="btn primary">Yes</button>
+    </div>
   </div>
 
+  <!-- Simple toast for messages -->
+  <div id="toast"></div>
+
   <script>
-    const sellBtn = document.getElementById('sellBtn');
-    const buyBtn = document.getElementById('buyBtn');
-    const sellForm = document.getElementById('sellForm');
+    /* --------------------------------------------------------------
+       GLOBALS & CONFIG
+       -------------------------------------------------------------- */
+    const sellBtn        = document.getElementById('sellBtn');
+    const buyBtn         = document.getElementById('buyBtn');
+    const sellForm       = document.getElementById('sellForm');
     const itemsContainer = document.getElementById('items-container');
     const disappearInput = document.getElementById('disappear_date');
-    const responseMsg = document.getElementById('responseMsg');
-    const archiveInput = document.getElementById('archive_url');
-    const fullscreenOverlay = document.getElementById('fullscreen-overlay');
+    const responseMsg    = document.getElementById('responseMsg');
+    const archiveInput   = document.getElementById('archive_url');
+    const BASE_URL       = 'https://buy_sell_metadata_backend.civilwan.workers.dev';
 
-    const BASE_URL = 'https://buy_sell_metadata_backend.civilwan.workers.dev';
+    // In‑memory cache for items list
     let cachedItems = null;
 
-    const today = new Date();
-    disappearInput.min = today.toISOString().split('T')[0];
-    disappearInput.max = new Date(today.setDate(today.getDate() + 10)).toISOString().split('T')[0];
+    // Variables that hold what should happen after the rewarded ad
+    let pendingLink   = null;   // URL to open after ad
+    let sellPendingData = null; // Metadata to POST after ad
 
+    // Set disappear_date range (today → +10 days)
+    const today   = new Date();
+    const minDate = today.toISOString().split('T')[0];
+    const maxDate = new Date(today.setDate(today.getDate() + 10)).toISOString().split('T')[0];
+    disappearInput.min = minDate;
+    disappearInput.max = maxDate;
+
+    /* --------------------------------------------------------------
+       UI: tab switching (Sell / Buy)
+       -------------------------------------------------------------- */
     sellBtn.onclick = () => {
       sellForm.style.display = 'flex';
       itemsContainer.style.display = 'none';
       responseMsg.textContent = '';
     };
-
     buyBtn.onclick = async () => {
       sellForm.style.display = 'none';
       itemsContainer.style.display = 'block';
       responseMsg.textContent = '';
 
-      itemsContainer.innerHTML = '<p>Loading...</p>';
+      if (cachedItems) {
+        console.log('📦 Using cached items');
+        displayItems(cachedItems);
+        return;
+      }
 
+      itemsContainer.innerHTML = '<p>Loading items…</p>';
       try {
         const res = await fetch(`${BASE_URL}/api/items`);
-        let data = await res.json();
-
+        const data = await res.json();
         if (!Array.isArray(data) || data.length === 0) {
           itemsContainer.innerHTML = '<p>No items available.</p>';
           return;
         }
-
-        // 🔀 SHUFFLE JSON RANDOMLY
-        data.sort(() => Math.random() - 0.5);
-
+        cachedItems = data;
+        console.log('✅ Items fetched & cached');
         displayItems(data);
-      } catch (err) {
-        console.error(err);
+      } catch (e) {
+        console.error(e);
         itemsContainer.innerHTML = '<p style="color:red;">Error loading items.</p>';
       }
     };
 
-    async function fetchArchiveMedia(url) {
-      try {
-        const id = url.split('/details/')[1];
-        const res = await fetch(`https://archive.org/metadata/${id}`);
-        const metadata = await res.json();
-        const files = metadata.files || [];
-
-        let file = files.find(f => f.name.endsWith('.mp4'));
-        let type = 'video';
-
-        if (!file) {
-          file = files.find(f => f.name.match(/\.(jpg|jpeg|png)$/i));
-          type = 'image';
-        }
-
-        if (!file) return null;
-
-        return {
-          url: `https://archive.org/download/${id}/${file.name}`,
-          type
-        };
-      } catch {
-        return null;
-      }
-    }
-
-    async function displayItems(data) {
-      itemsContainer.innerHTML = '';
-
-      for (const item of data) {
-        const media = await fetchArchiveMedia(item.archive_url);
-        let mediaHTML = '';
-
-        if (media) {
-          if (media.type === 'video') {
-            mediaHTML = `
-              <div style="position: relative;">
-                <video src="${media.url}" controls></video>
-                <button class="fullscreen-btn" onclick="openFullscreen('${media.url}','video')">⤢</button>
-              </div>
-            `;
-          } else {
-            mediaHTML = `
-              <div style="position: relative;">
-                <img src="${media.url}" />
-                <button class="fullscreen-btn" onclick="openFullscreen('${media.url}','image')">⤢</button>
-              </div>
-            `;
-          }
-        } else {
-          mediaHTML = `<iframe src="${item.archive_url}"></iframe>`;
-        }
-
-        const card = document.createElement('div');
-        card.className = 'item-card';
-        card.innerHTML = `
-          ${mediaHTML}
-          <h3>${item.item}</h3>
-          <p><strong>Details:</strong> ${item.details}</p>
-          <p><strong>Price:</strong> ₹${item.price}</p>
-          <p><strong>Discount:</strong> ${item.discount}%</p>
-          <p><strong>Address:</strong> ${item.address}</p>
-          <p><strong>Phone 1:</strong> ${item.phone_number_1}</p>
-          <p><strong>Phone 2:</strong> ${item.phone_number_2 || 'N/A'}</p>
-          <p><strong>URL:</strong> <a href="${item.url}" target="_blank">${item.url}</a></p>
-          <p><strong>Disappear Date:</strong> ${item.disappear_date}</p>
-          <p><strong>Post:</strong> ${item.post}</p>
-          <button onclick="openFullscreen('${item.archive_url}','archive')">View in Archive</button>
-        `;
-        itemsContainer.appendChild(card);
-      }
-    }
-
-    function openFullscreen(url, type) {
-      fullscreenOverlay.innerHTML = `<button id="close-overlay">Close</button>`;
-      let el;
-
-      if (type === 'video') {
-        el = document.createElement('video');
-        el.src = url;
-        el.controls = true;
-        el.autoplay = true;
-      } else if (type === 'image') {
-        el = document.createElement('img');
-        el.src = url;
-      } else {
-        el = document.createElement('iframe');
-        el.src = url;
-      }
-
-      fullscreenOverlay.appendChild(el);
-      fullscreenOverlay.style.display = 'flex';
-
-      document.getElementById('close-overlay').onclick = () => {
-        fullscreenOverlay.style.display = 'none';
-      };
-
-      document.onkeydown = e => {
-        if (e.key === "Escape") fullscreenOverlay.style.display = 'none';
-      };
-    }
-
-    sellForm.onsubmit = async (e) => {
+    /* --------------------------------------------------------------
+       SELL FORM – show ad‑confirm dialog, then ad, then submit
+       -------------------------------------------------------------- */
+    sellForm.onsubmit = (e) => {
       e.preventDefault();
+      responseMsg.textContent = '';
 
       const archiveURL = archiveInput.value.trim();
-      if (!archiveURL.includes("archive.org/details")) {
-        responseMsg.textContent = "❌ Enter a valid archive.org URL.";
-        responseMsg.className = "error";
+      if (!archiveURL.startsWith('https://archive.org/') &&
+          !archiveURL.startsWith('http://archive.org/')) {
+        responseMsg.textContent = '❌ Please enter a valid archive.org URL.';
+        responseMsg.className = 'error';
         return;
       }
 
-      const data = {
+      // Store payload for later POST (after ad)
+      sellPendingData = {
         archive_url: archiveURL,
         item: document.getElementById('item').value,
         details: document.getElementById('details').value,
@@ -415,26 +297,155 @@
         post: document.getElementById('post').value
       };
 
+      // Show confirmation modal
+      showModal('Watch a short ad to publish your post', () => {
+        // User confirmed → request rewarded ad
+        requestAd('sellPost');   // tag, not a real URL
+      });
+    };
+
+    async function postSellData(data) {
+      responseMsg.textContent = 'Posting…';
       try {
         const res = await fetch(`${BASE_URL}/api/sell`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data)
         });
-
         if (res.ok) {
-          responseMsg.textContent = "✅ Post submitted successfully!";
-          responseMsg.className = "success";
+          responseMsg.textContent = '✅ Post submitted successfully!';
+          responseMsg.className = 'success';
           sellForm.reset();
+          cachedItems = null; // refresh list next time user opens Buy
         } else {
-          responseMsg.textContent = "❌ Failed to submit post.";
-          responseMsg.className = "error";
+          responseMsg.textContent = '❌ Failed to submit post.';
+          responseMsg.className = 'error';
         }
-      } catch {
-        responseMsg.textContent = "⚠️ Error connecting to backend.";
-        responseMsg.className = "error";
+      } catch (e) {
+        responseMsg.textContent = '⚠️ Error connecting to backend.';
+        responseMsg.className = 'error';
       }
-    };
+      sellPendingData = null;
+    }
+
+    /* --------------------------------------------------------------
+       DISPLAY ITEMS AND LINK‑HANDLERS
+       -------------------------------------------------------------- */
+    function displayItems(data) {
+      itemsContainer.innerHTML = data.map(item => `
+        <div class="item-card">
+          <iframe src="${item.archive_url}" title="${item.item}" loading="lazy"></iframe>
+          <h3>${item.item}</h3>
+          <p><strong>Details:</strong> ${item.details}</p>
+          <p><strong>Price:</strong> ₹${item.price}</p>
+          <p><strong>Discount:</strong> ${item.discount}%</p>
+          <p><strong>Address:</strong> ${item.address}</p>
+          <p><strong>Phone 1:</strong> ${item.phone_number_1}</p>
+          <p><strong>Phone 2:</strong> ${item.phone_number_2 || 'N/A'}</p>
+          <p><strong>URL:</strong> <a href="${item.url}" target="_blank">${item.url}</a></p>
+          <p><strong>Disappear Date:</strong> ${item.disappear_date}</p>
+          <p><strong>Post:</strong> ${item.post}</p>
+        </div>
+      `).join('');
+      attachLinkHandlers();   // make each link go through the ad flow
+    }
+
+    function attachLinkHandlers() {
+      const links = itemsContainer.querySelectorAll('a');
+      links.forEach(a => {
+        a.addEventListener('click', ev => {
+          ev.preventDefault();
+          pendingLink = a.href;               // remember the link
+          showModal('Watch a short ad to view this link', () => {
+            requestAd(pendingLink);        // request ad, will open after completion
+          });
+        });
+      });
+    }
+
+    /* --------------------------------------------------------------
+       MODAL (popup) HELPERS
+       -------------------------------------------------------------- */
+    function showModal(message, onYes) {
+      const modal = document.getElementById('adModal');
+      document.getElementById('adModalMessage').textContent = message;
+      const yesBtn = document.getElementById('adModalYesBtn');
+      yesBtn.onclick = null;                 // clear previous handler
+      yesBtn.onclick = () => {
+        modal.classList.add('hidden');
+        if (typeof onYes === 'function') onYes();
+      };
+      modal.classList.remove('hidden');
+    }
+
+    /* --------------------------------------------------------------
+       REWARDED‑AD BRIDGE
+       -------------------------------------------------------------- */
+    function requestAd(target) {
+      // store what we need after the ad
+      if (typeof target === 'string' && target.startsWith('http')) {
+        pendingLink = target;
+      } else {
+        pendingLink = null;
+      }
+      if (window.Android && typeof Android.requestRewardedAd === 'function') {
+        Android.requestRewardedAd(target);
+      } else {
+        console.warn('Android bridge not available – ad ignored');
+        // Fallback: if we have a link, open it immediately
+        if (pendingLink) {
+          window.open(pendingLink, '_blank');
+          pendingLink = null;
+        }
+      }
+    }
+
+    /* --------------------------------------------------------------
+       AD CALLBACKS – invoked from native code
+       -------------------------------------------------------------- */
+    function onAdPreloaded()          { console.log('✅ Rewarded ad pre‑loaded'); }
+    function onAdFailedToPreload()    { console.warn('⚠️ Rewarded ad preload failed'); }
+    function onAdNotAvailable() {
+      showToast('Rewarded ad not available', true);
+      // Fallback: open link or post even if ad couldn't show
+      if (pendingLink) {
+        window.open(pendingLink, '_blank');
+        pendingLink = null;
+      } else if (sellPendingData) {
+        postSellData(sellPendingData);
+      }
+    }
+    function onAdCompleted(target) {
+      console.log('✅ Rewarded ad completed – target:', target);
+      if (pendingLink) {
+        window.open(pendingLink, '_blank');
+        pendingLink = null;
+      } else if (sellPendingData) {
+        postSellData(sellPendingData);
+      } else {
+        showToast('Reward earned');
+      }
+    }
+
+    /* --------------------------------------------------------------
+       SIMPLE TOAST
+       -------------------------------------------------------------- */
+    const toast = document.getElementById('toast');
+    let toastTimer = null;
+    function showToast(msg, err = false) {
+      toast.textContent = msg;
+      toast.style.background = err ? 'rgba(239,68,68,0.7)' : 'rgba(16,185,129,0.7)';
+      toast.style.display = 'block';
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.style.display = 'none', 3500);
+    }
+
+    /* --------------------------------------------------------------
+       PRE‑LOAD FIRST REWARDED AD (Android only)
+       -------------------------------------------------------------- */
+    if (window.Android && typeof Android.preloadRewardedAd === 'function') {
+      Android.preloadRewardedAd();
+    }
   </script>
 </body>
 </html>
