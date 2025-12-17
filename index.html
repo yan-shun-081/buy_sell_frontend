@@ -217,14 +217,13 @@
     const archiveInput   = document.getElementById('archive_url');
     const BASE_URL       = 'https://buy_sell_metadata_backend.civilwan.workers.dev';
 
-    // cache for items
-    let cachedItems = null;
+    let cachedItems = null;          // session cache
 
-    // data that must be acted on after the ad finishes
-    let pendingLink    = null;   // link to open
-    let sellPendingData = null; // data to POST after ad
+    // data waiting for ad completion
+    let pendingLink     = null;      // for Buy links
+    let sellPendingData = null;      // for Sell post
 
-    // set date range (today → +10 days)
+    // date range for disappear_date (today → +10 days)
     const today   = new Date();
     const minDate = today.toISOString().split('T')[0];
     const maxDate = new Date(today.setDate(today.getDate() + 10)).toISOString().split('T')[0];
@@ -235,14 +234,14 @@
        UI: toggle Sell / Buy panels
        -------------------------------------------------------------- */
     sellBtn.onclick = () => {
-      sellForm.style.display   = 'flex';
-      itemsContainer.style.display = 'none';
-      responseMsg.textContent = '';
+      sellForm.style.display          = 'flex';
+      itemsContainer.style.display    = 'none';
+      responseMsg.textContent         = '';
     };
     buyBtn.onclick = async () => {
-      sellForm.style.display   = 'none';
-      itemsContainer.style.display = 'block';
-      responseMsg.textContent = '';
+      sellForm.style.display          = 'none';
+      itemsContainer.style.display    = 'block';
+      responseMsg.textContent         = '';
 
       if (cachedItems) {
         console.log('📦 Using cached items');
@@ -268,7 +267,7 @@
     };
 
     /* --------------------------------------------------------------
-       SELL FORM – confirm → ad → POST
+       SELL FORM – confirm → ad → open URL → POST
        -------------------------------------------------------------- */
     sellForm.onsubmit = (e) => {
       e.preventDefault();
@@ -282,7 +281,7 @@
         return;
       }
 
-      // keep payload for later POST
+      // keep payload for later POST (after ad)
       sellPendingData = {
         archive_url: archiveURL,
         item: document.getElementById('item').value,
@@ -292,14 +291,14 @@
         address: document.getElementById('address').value,
         phone_number_1: document.getElementById('phone_number_1').value,
         phone_number_2: document.getElementById('phone_number_2').value,
-        url: document.getElementById('url').value,
+        url: document.getElementById('url').value,   // <-- URL to open after ad
         disappear_date: document.getElementById('disappear_date').value,
         post: document.getElementById('post').value
       };
 
-      // ask user to watch an ad before publishing
+      // ask user to watch a short ad before publishing
       showModal('Watch a short ad to publish your post', () => {
-        requestAd('sellPost');   // a tag – not a URL
+        requestAd('sellPost');   // just a tag – not a real URL
       });
     };
 
@@ -315,7 +314,7 @@
           responseMsg.textContent = '✅ Post submitted successfully!';
           responseMsg.className = 'success';
           sellForm.reset();
-          cachedItems = null; // force refresh on next Buy
+          cachedItems = null;      // force refresh for next Buy
         } else {
           responseMsg.textContent = '❌ Failed to submit post.';
           responseMsg.className = 'error';
@@ -328,7 +327,7 @@
     }
 
     /* --------------------------------------------------------------
-       DISPLAY ITEMS & attach link handlers
+       DISPLAY ITEMS & attach link handlers (Buy)
        -------------------------------------------------------------- */
     function displayItems(data) {
       itemsContainer.innerHTML = data.map(item => `
@@ -353,10 +352,10 @@
       const links = itemsContainer.querySelectorAll('a');
       links.forEach(a => {
         a.addEventListener('click', ev => {
-          ev.preventDefault();
-          pendingLink = a.href;
+          ev.preventDefault();                 // stop default navigation
+          pendingLink = a.href;                 // remember URL
           showModal('Watch a short ad to view this link', () => {
-            requestAd(pendingLink);   // ad → then open link
+            requestAd(pendingLink);            // trigger ad, then open link
           });
         });
       });
@@ -369,7 +368,7 @@
       const modal = document.getElementById('adModal');
       document.getElementById('adModalMessage').textContent = message;
       const yesBtn = document.getElementById('adModalYesBtn');
-      yesBtn.onclick = null;                     // clear any previous handler
+      yesBtn.onclick = null;                     // clear any old handler
       yesBtn.onclick = () => {
         modal.classList.add('hidden');
         if (typeof onYes === 'function') onYes();
@@ -381,71 +380,70 @@
        REWARDED‑AD bridge
        -------------------------------------------------------------- */
     function requestAd(target) {
-      // remember what we need after the ad
+      // remember a URL to open after the ad (if target is a URL)
       if (typeof target === 'string' && target.startsWith('http')) {
         pendingLink = target;
       } else {
-        pendingLink = null;
+        pendingLink = null;   // for non‑URL actions (e.g., sellPost)
       }
+
       if (window.Android && typeof Android.requestRewardedAd === 'function') {
         Android.requestRewardedAd(target);
       } else {
         console.warn('Android bridge unavailable – ad ignored');
         // fallback: open link immediately if we have one
         if (pendingLink) {
-          openUrl(pendingLink);
+          openLink(pendingLink);
           pendingLink = null;
         }
       }
     }
 
     /* --------------------------------------------------------------
-       AD CALLBACKS – invoked from native code
+       AD CALLBACKS – called from native code
        -------------------------------------------------------------- */
     function onAdPreloaded()          { console.log('✅ Rewarded ad pre‑loaded'); }
     function onAdFailedToPreload()    { console.warn('⚠️ Rewarded ad preload failed'); }
+
     function onAdNotAvailable() {
       showToast('Rewarded ad not available', true);
-      // fallback behavior
+      // fallback: still open the intended link or finish selling
       if (pendingLink) {
-        openUrl(pendingLink);
+        openLink(pendingLink);
         pendingLink = null;
       } else if (sellPendingData) {
+        // open seller's URL (if any) then post
+        if (sellPendingData.url) openLink(sellPendingData.url);
         postSellData(sellPendingData);
       }
     }
+
     function onAdCompleted(target) {
       console.log('✅ Rewarded ad completed – target:', target);
-      if (pendingLink) {
-        openUrl(pendingLink);
+      if (pendingLink) {               // Buy link case
+        openLink(pendingLink);
         pendingLink = null;
         return;
       }
-      if (sellPendingData) {
+      if (sellPendingData) {           // Sell case
+        if (sellPendingData.url) openLink(sellPendingData.url);
         postSellData(sellPendingData);
         return;
       }
-      // safety net – if the native side passed a URL we still open it
+      // If native side passed a URL directly, open it
       if (typeof target === 'string' && target.startsWith('http')) {
-        openUrl(target);
+        openLink(target);
         return;
       }
-      // otherwise just notify reward earned
+      // otherwise just acknowledge reward
       showToast('Reward earned');
     }
 
     /* --------------------------------------------------------------
-       Helper: open a URL (new tab / new window)
+       Helper: open a URL in a new tab/window
        -------------------------------------------------------------- */
-    function openUrl(url) {
-      // create a temporary <a> element and click it – works even without direct user gesture
-      const a = document.createElement('a');
-      a.href = url;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+    function openLink(url) {
+      window.open(url, '_blank');
     }
 
     /* --------------------------------------------------------------
