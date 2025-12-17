@@ -217,14 +217,14 @@
     const archiveInput   = document.getElementById('archive_url');
     const BASE_URL       = 'https://buy_sell_metadata_backend.civilwan.workers.dev';
 
-    // In‑memory cache for items list
+    // cache for items
     let cachedItems = null;
 
-    // Variables that hold what should happen after the rewarded ad
-    let pendingLink   = null;   // URL to open after ad
-    let sellPendingData = null; // Metadata to POST after ad
+    // data that must be acted on after the ad finishes
+    let pendingLink    = null;   // link to open
+    let sellPendingData = null; // data to POST after ad
 
-    // Set disappear_date range (today → +10 days)
+    // set date range (today → +10 days)
     const today   = new Date();
     const minDate = today.toISOString().split('T')[0];
     const maxDate = new Date(today.setDate(today.getDate() + 10)).toISOString().split('T')[0];
@@ -232,15 +232,15 @@
     disappearInput.max = maxDate;
 
     /* --------------------------------------------------------------
-       UI: tab switching (Sell / Buy)
+       UI: toggle Sell / Buy panels
        -------------------------------------------------------------- */
     sellBtn.onclick = () => {
-      sellForm.style.display = 'flex';
+      sellForm.style.display   = 'flex';
       itemsContainer.style.display = 'none';
       responseMsg.textContent = '';
     };
     buyBtn.onclick = async () => {
-      sellForm.style.display = 'none';
+      sellForm.style.display   = 'none';
       itemsContainer.style.display = 'block';
       responseMsg.textContent = '';
 
@@ -252,7 +252,7 @@
 
       itemsContainer.innerHTML = '<p>Loading items…</p>';
       try {
-        const res = await fetch(`${BASE_URL}/api/items`);
+        const res  = await fetch(`${BASE_URL}/api/items`);
         const data = await res.json();
         if (!Array.isArray(data) || data.length === 0) {
           itemsContainer.innerHTML = '<p>No items available.</p>';
@@ -268,7 +268,7 @@
     };
 
     /* --------------------------------------------------------------
-       SELL FORM – show ad‑confirm dialog, then ad, then submit
+       SELL FORM – confirm → ad → POST
        -------------------------------------------------------------- */
     sellForm.onsubmit = (e) => {
       e.preventDefault();
@@ -282,7 +282,7 @@
         return;
       }
 
-      // Store payload for later POST (after ad)
+      // keep payload for later POST
       sellPendingData = {
         archive_url: archiveURL,
         item: document.getElementById('item').value,
@@ -297,10 +297,9 @@
         post: document.getElementById('post').value
       };
 
-      // Show confirmation modal
+      // ask user to watch an ad before publishing
       showModal('Watch a short ad to publish your post', () => {
-        // User confirmed → request rewarded ad
-        requestAd('sellPost');   // tag, not a real URL
+        requestAd('sellPost');   // a tag – not a URL
       });
     };
 
@@ -316,7 +315,7 @@
           responseMsg.textContent = '✅ Post submitted successfully!';
           responseMsg.className = 'success';
           sellForm.reset();
-          cachedItems = null; // refresh list next time user opens Buy
+          cachedItems = null; // force refresh on next Buy
         } else {
           responseMsg.textContent = '❌ Failed to submit post.';
           responseMsg.className = 'error';
@@ -329,7 +328,7 @@
     }
 
     /* --------------------------------------------------------------
-       DISPLAY ITEMS AND LINK‑HANDLERS
+       DISPLAY ITEMS & attach link handlers
        -------------------------------------------------------------- */
     function displayItems(data) {
       itemsContainer.innerHTML = data.map(item => `
@@ -347,7 +346,7 @@
           <p><strong>Post:</strong> ${item.post}</p>
         </div>
       `).join('');
-      attachLinkHandlers();   // make each link go through the ad flow
+      attachLinkHandlers();
     }
 
     function attachLinkHandlers() {
@@ -355,22 +354,22 @@
       links.forEach(a => {
         a.addEventListener('click', ev => {
           ev.preventDefault();
-          pendingLink = a.href;               // remember the link
+          pendingLink = a.href;
           showModal('Watch a short ad to view this link', () => {
-            requestAd(pendingLink);        // request ad, will open after completion
+            requestAd(pendingLink);   // ad → then open link
           });
         });
       });
     }
 
     /* --------------------------------------------------------------
-       MODAL (popup) HELPERS
+       MODAL (popup) helpers
        -------------------------------------------------------------- */
     function showModal(message, onYes) {
       const modal = document.getElementById('adModal');
       document.getElementById('adModalMessage').textContent = message;
       const yesBtn = document.getElementById('adModalYesBtn');
-      yesBtn.onclick = null;                 // clear previous handler
+      yesBtn.onclick = null;                     // clear any previous handler
       yesBtn.onclick = () => {
         modal.classList.add('hidden');
         if (typeof onYes === 'function') onYes();
@@ -379,10 +378,10 @@
     }
 
     /* --------------------------------------------------------------
-       REWARDED‑AD BRIDGE
+       REWARDED‑AD bridge
        -------------------------------------------------------------- */
     function requestAd(target) {
-      // store what we need after the ad
+      // remember what we need after the ad
       if (typeof target === 'string' && target.startsWith('http')) {
         pendingLink = target;
       } else {
@@ -391,10 +390,10 @@
       if (window.Android && typeof Android.requestRewardedAd === 'function') {
         Android.requestRewardedAd(target);
       } else {
-        console.warn('Android bridge not available – ad ignored');
-        // Fallback: if we have a link, open it immediately
+        console.warn('Android bridge unavailable – ad ignored');
+        // fallback: open link immediately if we have one
         if (pendingLink) {
-          window.open(pendingLink, '_blank');
+          openUrl(pendingLink);
           pendingLink = null;
         }
       }
@@ -407,9 +406,9 @@
     function onAdFailedToPreload()    { console.warn('⚠️ Rewarded ad preload failed'); }
     function onAdNotAvailable() {
       showToast('Rewarded ad not available', true);
-      // Fallback: open link or post even if ad couldn't show
+      // fallback behavior
       if (pendingLink) {
-        window.open(pendingLink, '_blank');
+        openUrl(pendingLink);
         pendingLink = null;
       } else if (sellPendingData) {
         postSellData(sellPendingData);
@@ -418,17 +417,39 @@
     function onAdCompleted(target) {
       console.log('✅ Rewarded ad completed – target:', target);
       if (pendingLink) {
-        window.open(pendingLink, '_blank');
+        openUrl(pendingLink);
         pendingLink = null;
-      } else if (sellPendingData) {
-        postSellData(sellPendingData);
-      } else {
-        showToast('Reward earned');
+        return;
       }
+      if (sellPendingData) {
+        postSellData(sellPendingData);
+        return;
+      }
+      // safety net – if the native side passed a URL we still open it
+      if (typeof target === 'string' && target.startsWith('http')) {
+        openUrl(target);
+        return;
+      }
+      // otherwise just notify reward earned
+      showToast('Reward earned');
     }
 
     /* --------------------------------------------------------------
-       SIMPLE TOAST
+       Helper: open a URL (new tab / new window)
+       -------------------------------------------------------------- */
+    function openUrl(url) {
+      // create a temporary <a> element and click it – works even without direct user gesture
+      const a = document.createElement('a');
+      a.href = url;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    /* --------------------------------------------------------------
+       Simple toast helper
        -------------------------------------------------------------- */
     const toast = document.getElementById('toast');
     let toastTimer = null;
