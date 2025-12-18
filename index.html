@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Buy & Sell App</title>
+  <title>Buy &amp; Sell App</title>
 
   <style>
     /* -------- Base Styles -------- */
@@ -113,6 +113,12 @@
       line-height: 1.5;
     }
 
+    .item-card a.external-link {
+      color: #0069d9;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
     iframe {
       width: 100%;
       height: 250px;
@@ -131,35 +137,31 @@
     .success { color: green; }
     .error { color: red; }
 
-    /* -------- Modal (Ad Prompt) -------- */
+    /* -------- Modal -------- */
     .modal {
-      display: none;               /* hidden by default */
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.6);
-      justify-content: center;
+      background: rgba(0,0,0,0.5);
+      display: none;
       align-items: center;
-      z-index: 1000;
+      justify-content: center;
+      z-index: 2000;
     }
-
-    .modal-content {
+    .modal.active {
+      display: flex;
+    }
+    .modal .modal-content {
       background: #fff;
-      padding: 20px 25px;
-      border-radius: 8px;
+      padding: 20px 30px;
+      border-radius: 10px;
       max-width: 90%;
       text-align: center;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
     }
-
-    .modal-content p {
+    .modal .modal-content p {
       margin-bottom: 20px;
       font-size: 16px;
       color: #333;
-    }
-
-    .modal-content button {
-      margin: 0 8px;
-      min-width: 100px;
     }
 
     /* -------- Responsive Design -------- */
@@ -182,7 +184,7 @@
 <body>
 
   <div class="container">
-    <h1>Buy & Sell App</h1>
+    <h1>Buy &amp; Sell App</h1>
 
     <div class="button-group">
       <button id="sellBtn">Sell</button>
@@ -232,18 +234,22 @@
     <!-- ITEMS CONTAINER -->
     <div id="items-container"></div>
 
-    <!-- ---- Modal used for both SELL and BUY ---- -->
-    <div id="adPromptModal" class="modal">
+    <!-- MODAL (used for both Sell & Buy) -->
+    <div id="adModal" class="modal">
       <div class="modal-content">
-        <p id="adPromptMessage">Message</p>
-        <button id="adWatchBtn">Watch Ad</button>
-        <button id="adCancelBtn">Cancel</button>
+        <p id="modalMessage"></p>
+        <div class="modal-buttons">
+          <button id="watchAdBtn">Watch Ad</button>
+          <button id="cancelAdBtn">Cancel</button>
+        </div>
       </div>
     </div>
   </div>
 
   <script>
-    // -------------------- GLOBAL VARIABLES --------------------
+    /* -------------------------------------------------------------
+       Global variables & utilities
+    ------------------------------------------------------------- */
     const sellBtn = document.getElementById('sellBtn');
     const buyBtn = document.getElementById('buyBtn');
     const sellForm = document.getElementById('sellForm');
@@ -252,55 +258,152 @@
     const responseMsg = document.getElementById('responseMsg');
     const archiveInput = document.getElementById('archive_url');
 
-    // Modal elements
-    const adModal = document.getElementById('adPromptModal');
-    const adPromptMessage = document.getElementById('adPromptMessage');
-    const adWatchBtn = document.getElementById('adWatchBtn');
-    const adCancelBtn = document.getElementById('adCancelBtn');
+    const adModal = document.getElementById('adModal');
+    const modalMessage = document.getElementById('modalMessage');
+    const watchAdBtn = document.getElementById('watchAdBtn');
+    const cancelAdBtn = document.getElementById('cancelAdBtn');
 
     const BASE_URL = 'https://buy_sell_metadata_backend.civilwan.workers.dev';
 
-    // In‑memory cache (session based)
+    // In‑memory cache (session‑based)
     let cachedItems = null;
 
-    // Variables that hold what must happen after the ad
-    let pendingMetadata = null;   // object for SELL
-    let pendingLink = null;       // string (url) for BUY
-    let pendingAction = null;     // "sell" | "buy"
+    // Detect Android bridge (WebAppInterface) -------------------------------------------------
+    const isAndroid = typeof Android !== 'undefined' && Android !== null
+                      && typeof Android.requestRewardedAd === 'function';
 
-    // -------------------- UI HELPERS --------------------
-    function showModal(message) {
-      adPromptMessage.textContent = message;
-      adModal.style.display = 'flex';
+    if (isAndroid) {
+      // Pre‑load a rewarded ad as soon as the page is ready
+      Android.preloadRewardedAd();
     }
 
-    function hideModal() {
-      adModal.style.display = 'none';
-    }
-
-    // -------------------- DATE INPUT SETTINGS --------------------
-    // Set disappear_date range (today → +10 days)
+    // -------- Date range for disappear_date (today → +10 days) --------
     const today = new Date();
     const minDate = today.toISOString().split('T')[0];
     const maxDate = new Date(today.setDate(today.getDate() + 10)).toISOString().split('T')[0];
     disappearInput.min = minDate;
     disappearInput.max = maxDate;
 
-    // -------------------- BUTTON LOGIC --------------------
+    // -------- Modal helpers -------------------------------------------------
+    /** Shows the generic modal with a custom message.
+     *  `onWatch` is executed when the user clicks **Watch Ad**.
+     */
+    function showAdModal(message, onWatch) {
+      modalMessage.textContent = message;
+      adModal.classList.add('active');
+
+      // Clean up old listeners – we replace them each time
+      watchAdBtn.onclick = () => {
+        adModal.classList.remove('active');
+        if (typeof onWatch === 'function') {
+          onWatch();
+        }
+      };
+      cancelAdBtn.onclick = () => adModal.classList.remove('active');
+    }
+
+    // -------- Sell flow -------------------------------------------------
+    function showSellAdPopup(metadata) {
+      showAdModal('Watch a short ad to submit your post.', () => {
+        if (isAndroid) {
+          // Pass the whole JSON as the “targetUrl” – the Android side will
+          // fire onAdCompleted(jsonString) when the reward is earned.
+          Android.requestRewardedAd(JSON.stringify(metadata));
+        } else {
+          // Fallback when not running inside Android – simply submit.
+          submitMetadata(metadata);
+        }
+      });
+    }
+
+    function submitMetadata(metadata) {
+      fetch(`${BASE_URL}/api/sell`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(metadata)
+      })
+        .then(res => {
+          if (res.ok) {
+            responseMsg.textContent = '✅ Post submitted successfully!';
+            responseMsg.className = 'success';
+            sellForm.reset();
+            cachedItems = null; // next “Buy” fetch will get fresh data
+          } else {
+            responseMsg.textContent = '❌ Failed to submit post.';
+            responseMsg.className = 'error';
+          }
+        })
+        .catch(err => {
+          console.error(err);
+          responseMsg.textContent = '⚠️ Error connecting to backend.';
+          responseMsg.className = 'error';
+        });
+    }
+
+    // -------- Buy flow -------------------------------------------------
+    function showLinkAdPopup(url) {
+      showAdModal('Watch a short ad to open the link.', () => {
+        if (isAndroid) {
+          Android.requestRewardedAd(url);
+        } else {
+          // Fallback – just open the link.
+          window.open(url, '_blank');
+        }
+      });
+    }
+
+    // -------- Android bridge callbacks ------------------------------------
+    /**
+     * Called from Android after a rewarded ad has been watched.
+     * `param` may be a JSON string (sell metadata) or a plain URL.
+     */
+    function onAdCompleted(param) {
+      if (!param) return;
+
+      // Try to interpret param as JSON – if it works we treat it as
+      // sell‑metadata, otherwise as a URL.
+      try {
+        const data = JSON.parse(param);
+        // Assume it's the metadata for a sell post
+        submitMetadata(data);
+      } catch (e) {
+        // Not JSON → treat as a link to open
+        const url = param;
+        if (isAndroid && typeof Android.loadUrlInWebView === 'function') {
+          Android.loadUrlInWebView(url);
+        } else {
+          window.open(url, '_blank');
+        }
+      }
+    }
+
+    function onAdPreloaded() {
+      console.log('✅ Rewarded ad preloaded');
+    }
+    function onAdFailedToPreload() {
+      console.warn('⚠️ Failed to preload rewarded ad');
+    }
+    function onAdNotAvailable() {
+      console.warn('⚠️ No rewarded ad available');
+    }
+
+    // -------- UI interaction ------------------------------------------------
+    // Show Sell form
     sellBtn.onclick = () => {
       sellForm.style.display = 'flex';
       itemsContainer.style.display = 'none';
       responseMsg.textContent = '';
     };
 
+    // Show Buy items
     buyBtn.onclick = async () => {
       sellForm.style.display = 'none';
       itemsContainer.style.display = 'block';
       responseMsg.textContent = '';
 
-      // Use cached data if we have it
+      // Use cached data when possible
       if (cachedItems) {
-        console.log('📦 Using internally stored JSON');
+        console.log('📦 Using cached items');
         displayItems(cachedItems);
         return;
       }
@@ -316,8 +419,7 @@
           return;
         }
 
-        cachedItems = data;
-        console.log('✅ Data fetched from backend and stored internally.');
+        cachedItems = data;                     // store for the session
         displayItems(data);
       } catch (err) {
         console.error(err);
@@ -325,7 +427,7 @@
       }
     };
 
-    // -------------------- DISPLAY ITEMS --------------------
+    // Render items
     function displayItems(data) {
       itemsContainer.innerHTML = data.map(item => `
         <div class="item-card">
@@ -337,19 +439,29 @@
           <p><strong>Address:</strong> ${item.address}</p>
           <p><strong>Phone 1:</strong> ${item.phone_number_1}</p>
           <p><strong>Phone 2:</strong> ${item.phone_number_2 || 'N/A'}</p>
-          <p><strong>URL:</strong> <a href="${item.url}" target="_blank">${item.url}</a></p>
+          <p><strong>URL:</strong> <a href="${item.url}" class="external-link">${item.url}</a></p>
           <p><strong>Disappear Date:</strong> ${item.disappear_date}</p>
           <p><strong>Post:</strong> ${item.post}</p>
         </div>
       `).join('');
     }
 
-    // -------------------- SELL FORM SUBMISSION (WITH AD) --------------------
+    // Intercept link clicks inside the items container
+    itemsContainer.addEventListener('click', function (e) {
+      const tgt = e.target;
+      if (tgt.tagName.toLowerCase() === 'a' && tgt.classList.contains('external-link')) {
+        e.preventDefault();
+        const url = tgt.getAttribute('href');
+        showLinkAdPopup(url);
+      }
+    });
+
+    // Handle Sell form submission (show ad‑modal first)
     sellForm.onsubmit = (e) => {
       e.preventDefault();
       responseMsg.textContent = '';
 
-      // Validate archive URL (must be archive.org)
+      // ---- Archive URL validation ----
       const archiveURL = archiveInput.value.trim();
       if (!archiveURL.startsWith("https://archive.org/") && !archiveURL.startsWith("http://archive.org/")) {
         responseMsg.textContent = "❌ Please enter a valid archive.org URL.";
@@ -357,8 +469,8 @@
         return;
       }
 
-      // Gather form data – keep it for sending after the ad completes
-      pendingMetadata = {
+      // ---- Gather metadata ----
+      const metadata = {
         archive_url: archiveURL,
         item: document.getElementById('item').value,
         details: document.getElementById('details').value,
@@ -372,136 +484,9 @@
         post: document.getElementById('post').value
       };
 
-      pendingAction = 'sell';
-
-      // Show the “watch ad” popup
-      showModal('Watch a short ad to submit your post.');
+      // ---- Show the ad‑gate modal ----
+      showSellAdPopup(metadata);
     };
-
-    // -------------------- BUY LINK CLICK (WITH AD) --------------------
-    // Delegated click listener for any <a> inside #items-container
-    itemsContainer.addEventListener('click', (e) => {
-      if (e.target.tagName.toUpperCase() === 'A') {
-        e.preventDefault(); // stop immediate navigation
-        const url = e.target.getAttribute('href');
-
-        pendingLink = url;
-        pendingAction = 'buy';
-        showModal('Watch a short ad to open the link.');
-      }
-    });
-
-    // -------------------- MODAL BUTTON HANDLERS --------------------
-    adWatchBtn.onclick = () => {
-      hideModal(); // hide while the ad is shown
-
-      if (pendingAction === 'sell') {
-        // Sell – we do NOT need to pass a URL, just request the ad
-        if (typeof Android !== 'undefined' && Android.requestRewardedAd) {
-          Android.requestRewardedAd();               // calls requestRewardedAd() on Java side
-        } else {
-          // If we are not inside Android (e.g., testing in a browser) just submit
-          submitPendingMetadata();
-        }
-      } else if (pendingAction === 'buy') {
-        if (typeof Android !== 'undefined' && Android.requestRewardedAd) {
-          Android.requestRewardedAd(pendingLink);   // pass the link to be opened later
-        } else {
-          // In browser fallback – open directly
-          window.open(pendingLink, '_blank');
-          pendingLink = null;
-          pendingAction = null;
-        }
-      }
-    };
-
-    adCancelBtn.onclick = () => {
-      hideModal();
-      // Reset pending data – user decided not to continue
-      pendingMetadata = null;
-      pendingLink = null;
-      pendingAction = null;
-    };
-
-    // -------------------- AFTER AD CALLBACKS (FROM ANDROID) --------------------
-    // These functions are called from the Android WebAppInterface using evaluateJavascript()
-    function onAdCompleted(targetUrl) {
-      // For SELL the bridge sends "continue"
-      if (targetUrl === 'continue') {
-        submitPendingMetadata();
-      } else {
-        // BUY – open the link after the ad has been watched
-        if (typeof Android !== 'undefined' && Android.loadUrlInWebView) {
-          Android.loadUrlInWebView(targetUrl);
-        } else {
-          window.open(targetUrl, '_blank');
-        }
-        pendingLink = null;
-        pendingAction = null;
-      }
-    }
-
-    function onAdNotAvailable() {
-      hideModal();
-      alert('Ad is not available at the moment. Please try again later.');
-      // Reset pending data – we do not proceed
-      pendingMetadata = null;
-      pendingLink = null;
-      pendingAction = null;
-    }
-
-    function onAdPreloaded() {
-      console.log('✅ Rewarded ad pre‑loaded');
-    }
-
-    function onAdFailedToPreload() {
-      console.warn('⚠️ Rewarded ad failed to preload');
-    }
-
-    // -------------------- SUBMIT PENDING METADATA (SELL) --------------------
-    function submitPendingMetadata() {
-      if (!pendingMetadata) {
-        console.warn('No pending metadata to submit');
-        return;
-      }
-
-      responseMsg.textContent = 'Submitting...';
-      responseMsg.className = '';
-
-      fetch(`${BASE_URL}/api/sell`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(pendingMetadata)
-      })
-      .then(res => {
-        if (res.ok) {
-          responseMsg.textContent = '✅ Post submitted successfully!';
-          responseMsg.className = 'success';
-          sellForm.reset();
-          cachedItems = null; // clear BUY cache, new post may appear
-        } else {
-          responseMsg.textContent = '❌ Failed to submit post.';
-          responseMsg.className = 'error';
-        }
-      })
-      .catch(err => {
-        console.error(err);
-        responseMsg.textContent = '⚠️ Error connecting to backend.';
-        responseMsg.className = 'error';
-      })
-      .finally(() => {
-        // clean up stored data
-        pendingMetadata = null;
-        pendingAction = null;
-      });
-    }
-
-    // -------------------- INITIALISE AD PRE‑LOAD (if Android bridge exists) --------------------
-    document.addEventListener('DOMContentLoaded', () => {
-      if (typeof Android !== 'undefined' && Android.preloadRewardedAd) {
-        Android.preloadRewardedAd();
-      }
-    });
   </script>
 </body>
 </html>
